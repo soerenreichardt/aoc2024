@@ -8,27 +8,29 @@ pub fn part1() {
 
 pub fn part2() {
     let input = include_str!("../../res/day6/part1");
-    println!("{}", guard_path(input));
+    println!("{}", obstruction_loops(input));
 }
 
 fn guard_path(input: &str) -> u32 {
     let mut board = Board::from_str(input).unwrap();
-    board.predict_guard_movement().0
+    board.predict_guard_movement().len() as u32
 }
 
 fn obstruction_loops(input: &str) -> u32 {
     let mut board = Board::from_str(input).unwrap();
-    board.predict_guard_movement().1
+    let seen_positions = board.predict_guard_movement();
+    let initial_guard_position = board.find_guard();
+    Board::find_loops(&seen_positions, initial_guard_position, board)
 }
 
-#[derive(Debug)]
+#[derive(Clone, Debug)]
 enum Tile {
     Free,
     Occupied,
     Guard(Direction)
 }
 
-#[derive(Debug)]
+#[derive(Clone, Debug, Eq, Hash, PartialEq)]
 enum Direction {
     Left,
     Right,
@@ -45,9 +47,18 @@ impl Direction {
             Direction::Down => *self = Direction::Left,
         }
     }
+    
+    fn move_position(&self, (x, y): (usize, usize)) -> (usize, usize) {
+        match self {
+            Direction::Up => (x, y - 1),
+            Direction::Down => (x, y + 1),
+            Direction::Left => (x - 1, y),
+            Direction::Right => (x + 1, y),
+        }
+    }
 }
 
-#[derive(Debug)]
+#[derive(Clone, Debug)]
 struct Board {
     tiles: Vec<Vec<Tile>>,
     width: usize,
@@ -74,36 +85,55 @@ impl FromStr for Board {
 }
 
 impl Board {
-    fn predict_guard_movement(&mut self) -> (u32, u32) {
+    fn predict_guard_movement(&mut self) -> HashSet<(usize, usize)> {
         let mut guard_position = self.find_guard();
         let mut direction = Direction::Up;
         let mut seen_positions = HashSet::new();
-        seen_positions.insert(guard_position);
-        let mut loops = 0;
 
-        while true {
+        loop {
+            seen_positions.insert(guard_position);
             match self.move_guard(guard_position, &mut direction) {
                 Some(position) => guard_position = position,
                 None => break
             }
-            if seen_positions.insert(guard_position) {
-                loops += 1;
-            }
         }
 
-        (seen_positions.len() as u32, loops)
+        seen_positions
     }
 
+    fn find_loops(seen_positions: &HashSet<(usize, usize)>, initial_position: (usize, usize), board: Board) -> u32 {
+        let mut loops = 0;
+        for position in seen_positions {
+            if position == &initial_position {
+                continue
+            }
+            
+            let mut board = board.clone();
+            board.tiles[position.1][position.0] = Tile::Occupied;
+
+            let mut direction = Direction::Up;
+            let mut guard_position = initial_position.clone();
+            let mut seen_with_direction = HashSet::new();
+            loop {
+                if !seen_with_direction.insert((guard_position, direction.clone())) {
+                    loops += 1;
+                    break
+                }
+                match board.move_guard(guard_position, &mut direction) {
+                    Some(position) => guard_position = position,
+                    None => break
+                }
+            }
+        }
+        
+        loops
+    }
+    
     fn move_guard(&mut self, (x, y): (usize, usize), direction: &mut Direction) -> Option<(usize, usize)> {
         if self.is_outside((x, y), direction) {
             return None;
         }
-        let new_guard_position = match direction {
-            Direction::Up => (x, y - 1),
-            Direction::Down => (x, y + 1),
-            Direction::Left => (x - 1, y),
-            Direction::Right => (x + 1, y),
-        };
+        let new_guard_position = direction.move_position((x, y));
         if self.is_occupied(new_guard_position) {
             direction.turn_right();
             return self.move_guard((x, y), direction);
@@ -174,6 +204,6 @@ mod tests {
 #.........
 ......#..."#;
 
-        assert_eq!(41, obstruction_loops(input));
+        assert_eq!(6, obstruction_loops(input));
     }
 }
