@@ -20,7 +20,7 @@ fn obstruction_loops(input: &str) -> u32 {
     let mut board = Board::from_str(input).unwrap();
     let seen_positions = board.predict_guard_movement();
     let initial_guard_position = board.find_guard();
-    Board::find_loops(&seen_positions, initial_guard_position, board)
+    board.find_loops(&seen_positions, initial_guard_position)
 }
 
 #[derive(Clone, Debug)]
@@ -101,15 +101,14 @@ impl Board {
         seen_positions
     }
 
-    fn find_loops(seen_positions: &HashSet<(usize, usize)>, initial_position: (usize, usize), board: Board) -> u32 {
+    fn find_loops(&mut self, seen_positions: &HashSet<(usize, usize)>, initial_position: (usize, usize)) -> u32 {
         let mut loops = 0;
         for position in seen_positions {
             if position == &initial_position {
                 continue
             }
             
-            let mut board = board.clone();
-            board.tiles[position.1][position.0] = Tile::Occupied;
+            self.tiles[position.1][position.0] = Tile::Occupied;
 
             let mut direction = Direction::Up;
             let mut guard_position = initial_position.clone();
@@ -119,11 +118,13 @@ impl Board {
                     loops += 1;
                     break
                 }
-                match board.move_guard(guard_position, &mut direction) {
+                match self.move_guard(guard_position, &mut direction) {
                     Some(position) => guard_position = position,
                     None => break
                 }
             }
+
+            self.tiles[position.1][position.0] = Tile::Free;
         }
         
         loops
