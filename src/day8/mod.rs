@@ -2,7 +2,12 @@ use std::collections::{HashMap, HashSet};
 
 pub fn part1() {
     let input = include_str!("../../res/day8/part1");
-    println!("{}", anti_node_count(input));
+    println!("{}", anti_node_count(input, Distance::ONE));
+}
+
+pub fn part2() {
+    let input = include_str!("../../res/day8/part1");
+    println!("{}", anti_node_count(input, Distance::UNLIMITED));
 }
 
 #[derive(Copy, Clone, Debug, Eq, Hash, PartialEq)]
@@ -11,7 +16,13 @@ struct Position {
     y: i64,
 }
 
-fn anti_node_count(input: &str) -> u32 {
+#[derive(Copy, Clone)]
+enum Distance {
+    ONE,
+    UNLIMITED
+}
+
+fn anti_node_count(input: &str, distance: Distance) -> u32 {
     let height = input.lines().count();
     let width = input.lines().next().unwrap().len();
     let anti_node_positions = input
@@ -30,7 +41,7 @@ fn anti_node_count(input: &str) -> u32 {
             map
         })
         .into_iter()
-        .map(|(_, positions)| anti_nodes_for_frequency(positions, width, height))
+        .map(|(_, positions)| anti_nodes_for_frequency(positions, width, height, distance))
         .reduce(|mut lhs, rhs| {
             lhs.extend(rhs);
             lhs
@@ -42,23 +53,48 @@ fn anti_node_count(input: &str) -> u32 {
     anti_node_positions.len() as u32
 }
 
-fn anti_nodes_for_frequency(positions: Vec<Position>, width: usize, height: usize) -> HashSet<Position> {
+fn anti_nodes_for_frequency(positions: Vec<Position>, width: usize, height: usize, distance: Distance) -> HashSet<Position> {
     let mut anti_nodes = HashSet::new();
     for (start, &pos1) in positions.iter().enumerate() {
         for &pos2 in positions[start..].iter() {
             if pos1 == pos2 {
                 continue;
             }
-            let diff = pos2 - pos1;
-            let a1 = pos1 - diff;
-            let a2 = pos2 + diff;
 
-            if check_bounds(a1, width, height) {
-                anti_nodes.insert(a1);
+            match distance {
+                Distance::ONE => (),
+                Distance::UNLIMITED => {
+                    anti_nodes.insert(pos1);
+                    anti_nodes.insert(pos2);
+                },
             }
 
-            if check_bounds(a2, width, height) {
-                anti_nodes.insert(a2);
+            let diff = pos2 - pos1;
+            let mut a1 = pos1 - diff;
+            let mut a2 = pos2 + diff;
+            loop {
+                let mut a1_out_of_bounds = false;
+                if check_bounds(a1, width, height) {
+                    anti_nodes.insert(a1);
+                } else {
+                    a1_out_of_bounds = true;
+                }
+
+                let mut a2_out_of_bounds = false;
+                if check_bounds(a2, width, height) {
+                    anti_nodes.insert(a2);
+                } else {
+                    a2_out_of_bounds = true;
+                }
+
+                match distance {
+                    Distance::ONE => break,
+                    Distance::UNLIMITED if a1_out_of_bounds && a2_out_of_bounds => break,
+                    Distance::UNLIMITED => {
+                        a1 = a1 - diff;
+                        a2 = a2 + diff;
+                    }
+                }
             }
         }
     }
@@ -114,6 +150,24 @@ mod tests {
 ............
 ............"#;
 
-        assert_eq!(14, anti_node_count(&input));
+        assert_eq!(14, anti_node_count(&input, Distance::ONE));
+    }
+
+    #[test]
+    fn part2() {
+        let input = r#"............
+........0...
+.....0......
+.......0....
+....0.......
+......A.....
+............
+............
+........A...
+.........A..
+............
+............"#;
+
+        assert_eq!(34, anti_node_count(&input, Distance::UNLIMITED));
     }
 }
