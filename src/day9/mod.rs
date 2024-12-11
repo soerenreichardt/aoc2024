@@ -5,6 +5,11 @@ pub fn part1() {
     println!("{}", fragment_disk(input));
 }
 
+pub fn part2() {
+    let input = include_str!("../../res/day9/part1");
+    println!("{}", move_files(input));
+}
+
 struct Cursor<'a> {
     index: usize,
     inner: Range<u32>,
@@ -14,7 +19,7 @@ struct Cursor<'a> {
 }
 
 fn fragment_disk(input: &str) -> u64 {
-    let mut input = input.chars().map(|c| c.to_digit(10).unwrap()).collect::<Vec<u32>>();
+    let input = input.chars().map(|c| c.to_digit(10).unwrap()).collect::<Vec<u32>>();
 
     let mut forward_cursor = Cursor::forward(&input);
     let mut backward_cursor = Cursor::backward(&input);
@@ -38,6 +43,82 @@ fn fragment_disk(input: &str) -> u64 {
     }
 
     checksum
+}
+
+#[derive(Debug)]
+enum State {
+    File(usize, u32),
+    Free(usize)
+}
+
+fn move_files(input: &str) -> usize {
+    let mut input = input
+        .chars()
+        .map(|c| c.to_digit(10).unwrap())
+        .enumerate()
+        .map(|(i, len)| if i % 2 == 0 {
+            State::File(len as usize, (i / 2) as u32)
+        } else {
+            State::Free(len as usize)
+        })
+        .collect::<Vec<_>>();
+
+    loop {
+        let mut changed = false;
+        for index in (0..input.len()).rev() {
+            let free_slot_with_file = match input[index] {
+                State::File(length, label) => {
+                    let mut result = None;
+                    for i in 0..input.len() {
+                        match input[i] {
+                            State::Free(len) if len >= length && i < index => {
+                                result = Some((i, length, label, len - length));
+                                break;
+                            },
+                            _ => ()
+                        };
+                    }
+                    result
+                }
+                State::Free(_) => None
+            };
+
+            if let Some((free_slot, length, label, remainder)) = free_slot_with_file {
+                input[index] = State::Free(length);
+                input[free_slot] = State::File(length, label);
+                if remainder > 0 {
+                    input.insert(free_slot + 1, State::Free(remainder));
+                }
+                changed = true;
+            }
+
+            if changed {
+                break;
+            }
+        }
+
+        if !changed {
+            break;
+        }
+    }
+
+    let mut global_position = 0;
+    let mut sum = 0usize;
+    for state in input.iter() {
+        match state {
+            State::Free(length) => {
+                global_position += length;
+            }
+            State::File(length, label) => {
+                (0..*length).for_each(|_| {
+                    sum += *label as usize * global_position;
+                    global_position += 1;
+                })
+            }
+        }
+    }
+
+    sum
 }
 
 impl<'a> Cursor<'a> {
@@ -95,4 +176,13 @@ mod tests {
         let input = "2333133121414131402";
         assert_eq!(1928, fragment_disk(input));
     }
+
+    #[test]
+    fn part2() {
+        let input = "2333133121414131402";
+        assert_eq!(2858, move_files(input));
+    }
 }
+
+// 00992111777.44.333....5555.6666.....8888..
+// [File(2, 0), File(2, 9), File(1, 2), File(3, 1), File(3, 7), Free(1), File(2, 4), Free(1), File(3, 3), Free(1), Free(2), Free(1), File(4, 5), Free(1), File(4, 6), Free(1), Free(3), Free(1), File(4, 8), Free(0), Free(2)]
