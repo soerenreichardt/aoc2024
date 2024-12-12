@@ -15,56 +15,48 @@ fn stone_count(input: &str, num_blinks: u8) -> usize {
         .split_whitespace()
         .map(|s| s.parse::<usize>().unwrap())
         .collect::<Vec<_>>();
-    let mut memory: HashMap<(u8, usize), Vec<usize>> = HashMap::new();
-    simulate_blink(stones, 0, num_blinks, &mut memory).len()
+    let mut memory: HashMap<(u8, usize), usize> = HashMap::new();
+    simulate_blink(stones, num_blinks, &mut memory)
 }
 
-fn simulate_blink(stones: Vec<usize>, step: u8, limit: u8, memory: &mut HashMap<(u8, usize), Vec<usize>>) -> Vec<usize> {
-    if step == limit {
-        return stones;
-    }
+fn simulate_blink(stones: Vec<usize>, limit: u8, memory: &mut HashMap<(u8, usize), usize>) -> usize {
     stones
         .into_iter()
-        .flat_map(|s| {
-            let cache_entry = (step..limit).find_map(|step| match memory.get(&(step, s)) {
-                Some(result) => Some((step, result)),
-                None => None,
-            });
-
-            match cache_entry {
-                Some((cached_step, result)) if cached_step == step => result.clone(),
-                Some((cached_step, result)) => simulate_blink(result.clone(), step + limit - cached_step, limit, memory),
-                None => simulate_one_stone(s, step, limit, memory)
-            }
-        })
-        .collect::<Vec<_>>()
+        .map(|s| simulate_one_stone(s, 0, limit, memory))
+        .sum()
 }
 
-fn simulate_one_stone(stone: usize, step: u8, limit: u8, memory: &mut HashMap<(u8, usize), Vec<usize>>) -> Vec<usize> {
-    let iteration = apply_rules(stone);
-    let result = simulate_blink(iteration, step + 1, limit, memory);
-    memory.insert((step, stone), result.clone());
-    result
-}
-
-fn apply_rules(stone: usize) -> Vec<usize> {
-    match stone {
-        0 => vec![1],
-        d => {
-            let s = d.to_string();
-            let len = s.len();
-            if len % 2 == 0 {
-                return split_number(s, len);
-            }
-            vec![d * 2024]
+fn simulate_one_stone(stone: usize, step: u8, limit: u8, memory: &mut HashMap<(u8, usize), usize>) -> usize {
+    if step == limit {
+        return 1;
+    }
+    match memory.get(&(step, stone)) {
+        Some(result) => *result,
+        None => {
+            let iteration = match stone {
+                0 => simulate_one_stone(1, step + 1, limit, memory),
+                d => {
+                    let s = d.to_string();
+                    let len = s.len();
+                    if len % 2 == 0 {
+                        let (left, right) = split_number(s, len);
+                        simulate_one_stone(left, step + 1, limit, memory) +
+                            simulate_one_stone(right, step + 1, limit, memory)
+                    } else {
+                        simulate_one_stone(d * 2024, step + 1, limit, memory)
+                    }
+                }
+            };
+            memory.insert((step, stone), iteration);
+            iteration
         }
     }
 }
 
-fn split_number(s: String, len: usize) -> Vec<usize> {
+fn split_number(s: String, len: usize) -> (usize, usize) {
     let left = s[0..len / 2].parse::<usize>().unwrap();
     let right = s[len / 2..len].parse::<usize>().unwrap();
-    vec![left, right]
+    (left, right)
 }
 
 #[cfg(test)]
