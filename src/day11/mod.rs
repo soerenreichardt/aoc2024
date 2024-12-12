@@ -11,7 +11,10 @@ pub fn part2() {
 }
 
 fn stone_count(input: &str, num_blinks: u8) -> usize {
-    let stones = input.split_whitespace().map(|s| s.parse::<usize>().unwrap()).collect::<Vec<_>>();
+    let stones = input
+        .split_whitespace()
+        .map(|s| s.parse::<usize>().unwrap())
+        .collect::<Vec<_>>();
     let mut memory: HashMap<(u8, usize), Vec<usize>> = HashMap::new();
     simulate_blink(stones, 0, num_blinks, &mut memory).len()
 }
@@ -20,10 +23,21 @@ fn simulate_blink(stones: Vec<usize>, step: u8, limit: u8, memory: &mut HashMap<
     if step == limit {
         return stones;
     }
-    stones.into_iter().flat_map(|s| match memory.get(&(step, s)) {
-        Some(result) => result.clone(),
-        None => simulate_one_stone(s, step, limit, memory)
-    }).collect::<Vec<_>>()
+    stones
+        .into_iter()
+        .flat_map(|s| {
+            let cache_entry = (step..limit).find_map(|step| match memory.get(&(step, s)) {
+                Some(result) => Some((step, result)),
+                None => None,
+            });
+
+            match cache_entry {
+                Some((cached_step, result)) if cached_step == step => result.clone(),
+                Some((cached_step, result)) => simulate_blink(result.clone(), step + limit - cached_step, limit, memory),
+                None => simulate_one_stone(s, step, limit, memory)
+            }
+        })
+        .collect::<Vec<_>>()
 }
 
 fn simulate_one_stone(stone: usize, step: u8, limit: u8, memory: &mut HashMap<(u8, usize), Vec<usize>>) -> Vec<usize> {
@@ -40,16 +54,16 @@ fn apply_rules(stone: usize) -> Vec<usize> {
             let s = d.to_string();
             let len = s.len();
             if len % 2 == 0 {
-                return split_number(s, len)
+                return split_number(s, len);
             }
             vec![d * 2024]
-        },
+        }
     }
 }
 
 fn split_number(s: String, len: usize) -> Vec<usize> {
-    let left = s[0..len/2].parse::<usize>().unwrap();
-    let right = s[len/2..len].parse::<usize>().unwrap();
+    let left = s[0..len / 2].parse::<usize>().unwrap();
+    let right = s[len / 2..len].parse::<usize>().unwrap();
     vec![left, right]
 }
 
