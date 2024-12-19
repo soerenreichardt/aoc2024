@@ -11,28 +11,21 @@ pub fn part2() {
     println!("{}", fence_price_discount(input));
 }
 
-fn fence_price(input: &str) -> u32 {
-    components(input).into_iter().fold(0, |acc, component| {
-        let area = component.area();
-        let perimeter = component.perimeter();
-        println!("{} - area: {}, perimeter: {}", component.name, area, perimeter);
-        acc + area * perimeter
-    })
-}
-
 struct Component {
     name: char,
-    positions: HashSet<Position>
+    positions: HashSet<Position>,
+    min: Position,
+    max: Position,
 }
 
-#[derive(PartialEq, Hash, Eq, Clone)]
+#[derive(Debug, PartialEq, Hash, Eq, Clone)]
 struct Position {
-    x: usize,
-    y: usize,
+    x: i64,
+    y: i64,
 }
 
-impl From<(usize, usize)> for Position {
-    fn from((x, y): (usize, usize)) -> Self {
+impl From<(i64, i64)> for Position {
+    fn from((x, y): (i64, i64)) -> Self {
         Position { x, y }
     }
 }
@@ -46,32 +39,118 @@ impl Component {
         self.positions.iter()
             .fold(0, |perimeter, position| {
                 let neighborhood = position.neighborhood();
-                let out_of_bounds_neighbors = 4 - neighborhood.len() as u32;
                 let uncontained_neighbors = neighborhood.into_iter().filter(|p| !self.positions.contains(&p)).count() as u32;
-                perimeter + uncontained_neighbors + out_of_bounds_neighbors
+                perimeter + uncontained_neighbors
             })
+    }
+
+    fn edge_positions(&self) -> HashSet<Position> {
+        self.positions.iter()
+            .filter_map(|p| if p.neighborhood().into_iter().all(|p| self.positions.contains(&p)) {
+                None
+            } else {
+                Some(p.clone())
+            })
+            .collect::<HashSet<_>>()
+    }
+
+    fn edge_segments(&self) -> u32 {
+        let mut segments = 0;
+
+        for x in self.min.x..=self.max.x {
+            let mut last_left_contained = true;
+            let mut last_right_contained = true;
+            for y in self.min.y..=self.max.y {
+                let position: Position = (x, y).into();
+                if !self.positions.contains(&position) {
+                    last_left_contained = true;
+                    last_right_contained = true;
+                    continue;
+                }
+                let [left, _, right, _] = position.neighborhood();
+                let left_contained = self.positions.contains(&left);
+                if left_contained {
+                } else {
+                }
+                if !left_contained && last_left_contained {
+                    segments += 1;
+                }
+                last_left_contained = left_contained;
+
+                let right_contained = self.positions.contains(&right);
+                if right_contained {
+                } else {
+                }
+                if !right_contained && last_right_contained {
+                    segments += 1;
+                }
+                last_right_contained = right_contained;
+            }
+        }
+
+        for y in self.min.y..=self.max.y {
+            let mut last_top_contained = true;
+            let mut last_bottom_contained = true;
+            for x in self.min.x..=self.max.x {
+                let position: Position = (x, y).into();
+                if !self.positions.contains(&position) {
+                    last_top_contained = true;
+                    last_bottom_contained = true;
+                    continue;
+                }
+
+                let [_, top, _, bottom] = position.neighborhood();
+                let top_contained = self.positions.contains(&top);
+                if top_contained {
+                } else {
+                }
+                if !top_contained && last_top_contained {
+                    segments += 1;
+                }
+                last_top_contained = top_contained;
+
+                let bottom_contained = self.positions.contains(&bottom);
+                if bottom_contained {
+                } else {
+                }
+                if !bottom_contained && last_bottom_contained {
+                    segments += 1;
+                }
+                last_bottom_contained = bottom_contained;
+            }
+        }
+
+        segments
     }
 }
 
 impl Position {
-    fn neighborhood(&self) -> Vec<Position> {
-        let mut positions = Vec::new();
+    fn neighborhood(&self) -> [Position;4] {
         let x = self.x;
         let y = self.y;
-        if x > 0 {
-            positions.push((x-1, y).into())
-        }
-        if y > 0 {
-            positions.push((x, y-1).into())
-        }
-        positions.push((x+1, y).into());
-        positions.push((x, y+1).into());
-        positions
+        [
+            Position { x: x-1, y      },
+            Position { x,      y: y-1 },
+            Position { x: x+1, y      },
+            Position { x,      y: y+1 },
+        ]
     }
 }
 
+fn fence_price(input: &str) -> u32 {
+    components(input).into_iter().fold(0, |acc, component| {
+        let area = component.area();
+        let perimeter = component.perimeter();
+        acc + area * perimeter
+    })
+}
+
 fn fence_price_discount(input: &str) -> u32 {
-    todo!()
+    components(input).into_iter().map(|component| {
+        let segments = component.edge_segments();
+        let area = component.area();
+        segments * area
+    }).sum()
 }
 
 fn components(input: &str) -> Vec<Component> {
@@ -93,6 +172,10 @@ fn components(input: &str) -> Vec<Component> {
 fn component(name: char, (x, y): (usize, usize), board: &[Vec<char>], visited: &mut HashSet<(usize, usize)>) -> Component {
     let mut stack = Vec::new();
     let mut positions = HashSet::new();
+    let mut min_x = i64::MAX;
+    let mut max_x = i64::MIN;
+    let mut min_y = i64::MAX;
+    let mut max_y = i64::MIN;
 
     stack.push((x, y));
     while let Some((x, y)) = stack.pop() {
@@ -105,7 +188,11 @@ fn component(name: char, (x, y): (usize, usize), board: &[Vec<char>], visited: &
         }
 
         visited.insert((x, y));
-        positions.insert((x, y).into());
+        positions.insert((x as i64, y as i64).into());
+        min_x = min_x.min(x as i64);
+        max_x = max_x.max(x as i64);
+        min_y = min_y.min(y as i64);
+        max_y = max_y.max(y as i64);
 
         if x > 0 {
             stack.push((x - 1, y));
@@ -121,7 +208,9 @@ fn component(name: char, (x, y): (usize, usize), board: &[Vec<char>], visited: &
         }
     }
 
-    Component { name, positions }
+    let min = (min_x, min_y).into();
+    let max = (max_x, max_y).into();
+    Component { name, positions, min, max }
 }
 
 #[cfg(test)]
@@ -140,12 +229,16 @@ EEEC"#;
 
     #[test]
     fn part2() {
-        let input = r#"AAAAAA
-AAABBA
-AAABBA
-ABBAAA
-ABBAAA
-AAAAAA"#;
+        let input = r#"RRRRIICCFF
+RRRRIICCCF
+VVRRRCCFFF
+VVRCCCJFFF
+VVVVCJJCFE
+VVIVCCJJEE
+VVIIICJJEE
+MIIIIIJJEE
+MIIISIJEEE
+MMMISSJEEE"#;
 
         assert_eq!(80, fence_price_discount(input));
     }
