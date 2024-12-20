@@ -121,7 +121,7 @@ impl From<&mut &str> for ClawMachine {
 
 impl ClawMachine {
     fn cheapest_win(&self, scaled: bool) -> i64 {
-        let prize = if scaled { self.prize.clone() * 10000000000000 } else { self.prize.clone() };
+        let prize = if scaled { self.prize.clone() + Position { x: 10000000000000, y: 10000000000000 } } else { self.prize.clone() };
 
         let line_a = Line(Position { x: 0, y: 0 }, self.button_a.clone());
         let line_b = Line(prize.clone() - self.button_b.clone(), prize.clone());
